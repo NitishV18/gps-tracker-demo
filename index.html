@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Device Tracker — Demo</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root{--bg:#f7f8fb;--card:#ffffff;--muted:#6b7280;--accent:#2563eb;--glass:rgba(255,255,255,0.6)}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:#0f1724}
+    .wrap{max-width:1100px;margin:32px auto;padding:18px}
+    header{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    p.lead{margin:0;color:var(--muted);font-size:13px}
+
+    .layout{display:grid;grid-template-columns:280px 1fr;gap:16px}
+    .panel{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 20px rgba(15,23,42,0.06)}
+
+    .devices{display:flex;flex-direction:column;gap:10px}
+    .device{padding:10px;border-radius:10px;border:1px solid #eef2ff;background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.4));cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;display:flex;justify-content:space-between;align-items:center}
+    .device:hover{transform:translateY(-4px);box-shadow:0 8px 18px rgba(16,24,40,0.06)}
+    .device.active{border-color:var(--accent);box-shadow:0 12px 34px rgba(37,99,235,0.08)}
+    .dev-name{font-weight:600}
+    .dev-sub{font-size:12px;color:var(--muted)}
+
+    #map{height:560px;border-radius:12px}
+
+    .status{margin-top:12px;font-size:13px;color:var(--muted)}
+    .coord{margin-top:10px;font-weight:700}
+    .small{font-size:12px;color:var(--muted)}
+
+    .controls{display:flex;gap:8px;margin-top:10px}
+    .btn{padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+    .btn.ghost{background:transparent;border:1px solid #e6eefc;color:var(--muted)}
+
+    @media (max-width:900px){.layout{grid-template-columns:1fr;}.panel{padding:12px}.devices{flex-direction:row;overflow:auto}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Device Tracker — Minimal Demo</h1>
+        <p class="lead">Click a device to start its simulated movement. Map: OpenStreetMap via Leaflet.</p>
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="panel">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="small">Devices</div>
+            <div class="status">Tap a device to simulate continuous movement</div>
+          </div>
+        </div>
+
+        <div class="devices" id="devicesList" style="margin-top:12px">
+          <!-- devices injected here -->
+        </div>
+
+        <div class="panel" style="margin-top:14px;background:transparent;box-shadow:none;padding:0">
+          <div class="small">Selected</div>
+          <div id="selectedName" class="dev-name">—</div>
+          <div class="small">Latitude</div>
+          <div id="latVal" class="coord">—</div>
+          <div class="small">Longitude</div>
+          <div id="lngVal" class="coord">—</div>
+
+          <div class="controls">
+            <button id="btnStop" class="btn ghost">Stop</button>
+            <button id="btnCenter" class="btn">Center Map</button>
+          </div>
+        </div>
+      </aside>
+
+      <main>
+        <div class="panel" style="padding:10px">
+          <div id="map"></div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const devices = [
+      {id: 'hrudyan', name: 'Hrudyan', color:'#2563eb'},
+      {id: 'nitish', name: 'Nitish V', color:'#f97316'}
+    ];
+
+    const map = L.map('map', {center:[19.07598,72.87765], zoom:11});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}).addTo(map);
+
+    const state = {};
+    devices.forEach((d,i)=>{
+      const lat = 19.05 + (i*0.03);
+      const lng = 72.85 + (i*0.04);
+      const marker = L.circleMarker([lat,lng],{radius:8,fillColor:d.color,color:'#fff',weight:2,fillOpacity:1}).addTo(map);
+      marker.bindTooltip(d.name,{permanent:true,direction:'right'}).openTooltip();
+
+      state[d.id] = {info:d,pos:[lat,lng],marker,interval:null,animating:false};
+    });
+
+    const devicesList = document.getElementById('devicesList');
+    devices.forEach(d=>{
+      const el = document.createElement('div');
+      el.className = 'device';
+      el.id = 'dev-'+d.id;
+      el.innerHTML = `<div><div class='dev-name'>${d.name}</div><div class='dev-sub small'>Click to simulate</div></div><div style='width:12px;height:12px;border-radius:6px;background:${d.color}'></div>`;
+      devicesList.appendChild(el);
+      el.addEventListener('click', ()=>selectDevice(d.id));
+    });
+
+    const selectedName = document.getElementById('selectedName');
+    const latVal = document.getElementById('latVal');
+    const lngVal = document.getElementById('lngVal');
+    const btnStop = document.getElementById('btnStop');
+    const btnCenter = document.getElementById('btnCenter');
+
+    btnStop.addEventListener('click', ()=>{ if(currentId) stopSimulation(currentId); });
+    btnCenter.addEventListener('click', ()=>{ if(currentId){ map.setView(state[currentId].pos, 13); }});
+
+    let currentId = null;
+
+    function selectDevice(id){
+      devices.forEach(d=>document.getElementById('dev-'+d.id).classList.remove('active'));
+      document.getElementById('dev-'+id).classList.add('active');
+      currentId = id;
+      selectedName.textContent = state[id].info.name;
+      updateCoordsDisplay(state[id].pos[0], state[id].pos[1]);
+      if(!state[id].interval) startSimulation(id);
+      map.setView(state[id].pos, 13);
+    }
+
+    function updateCoordsDisplay(lat,lng){
+      latVal.textContent = lat.toFixed(6);
+      lngVal.textContent = lng.toFixed(6);
+    }
+
+    function startSimulation(id){
+      const item = state[id];
+      if(item.interval) return;
+      scheduleMove(id);
+      item.interval = setInterval(()=>scheduleMove(id), 5000); // slower updates
+    }
+
+    function stopSimulation(id){
+      const item = state[id];
+      if(item.interval){ clearInterval(item.interval); item.interval = null; }
+      item.animating = false;
+      document.getElementById('dev-'+id).classList.remove('active');
+      if(currentId === id){ currentId = null; selectedName.textContent = '—'; latVal.textContent='—'; lngVal.textContent='—'; }
+    }
+
+    function scheduleMove(id){
+      const item = state[id];
+      const [lat,lng] = item.pos;
+      const dLat = (Math.random()-0.5)*0.01; // smaller range for smoother slow motion
+      const dLng = (Math.random()-0.5)*0.01;
+      const newLat = lat + dLat;
+      const newLng = lng + dLng;
+      animateMarker(id, [lat,lng], [newLat,newLng], 3000); // longer duration for slower movement
+      item.pos = [newLat,newLng];
+      if(currentId === id) updateCoordsDisplay(newLat,newLng);
+    }
+
+    function animateMarker(id, from, to, duration){
+      const item = state[id];
+      const marker = item.marker;
+      if(item.animating) return;
+      item.animating = true;
+      const start = performance.now();
+      function step(now){
+        const t = Math.min(1, (now - start)/duration);
+        const ease = t<0.5 ? 2*t*t : -1 + (4-2*t)*t;
+        const lat = from[0] + (to[0]-from[0])*ease;
+        const lng = from[1] + (to[1]-from[1])*ease;
+        marker.setLatLng([lat,lng]);
+        const r = 6 + Math.abs(Math.sin(ease*Math.PI))*3;
+        marker.setStyle({radius:r});
+        if(t<1) requestAnimationFrame(step);
+        else { item.animating = false; marker.setStyle({radius:8}); }
+      }
+      requestAnimationFrame(step);
+    }
+  </script>
+</body>
+</html>

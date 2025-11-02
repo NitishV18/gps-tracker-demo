@@ -24,7 +24,7 @@
     .dev-name{font-weight:600}
     .dev-sub{font-size:12px;color:var(--muted)}
 
-    #map{height:560px;border-radius:12px}
+    #map{height:520px;border-radius:12px}
 
     .status{margin-top:12px;font-size:13px;color:var(--muted)}
     .coord{margin-top:10px;font-weight:700}
@@ -34,7 +34,31 @@
     .btn{padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer}
     .btn.ghost{background:transparent;border:1px solid #e6eefc;color:var(--muted)}
 
-    @media (max-width:900px){.layout{grid-template-columns:1fr;}.panel{padding:12px}.devices{flex-direction:row;overflow:auto}}
+    /* Circuit panel styles */
+    #circuitWrap{margin-top:18px}
+    .circuit-panel{padding:18px;border-radius:12px;background:linear-gradient(180deg,#fff,#fbfdff);box-shadow:0 8px 28px rgba(15,23,42,0.05)}
+    .circuit-header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+    .circuit-title{font-weight:700}
+    .circuit-sub{font-size:13px;color:var(--muted)}
+
+    .svg-wrap{width:100%;height:320px;margin-top:12px}
+    svg{width:100%;height:100%}
+
+    /* Visual styles for the SVG circuit */
+    .wire{stroke:#9aa6b2;stroke-width:3;fill:none}
+    .wire.current{stroke:#2563eb;stroke-width:4;stroke-linecap:round;stroke-dasharray:12 8;animation:flow 1.8s linear infinite}
+    .comp{fill:#f1f5f9;stroke:#dbe7fb;stroke-width:1.5;rx:8}
+    .chip{fill:#eef2ff;stroke:#cfe1ff}
+    .label{font-size:12px;fill:#334155;font-weight:600}
+
+    .led{fill:#ff4d4f;stroke:#fff;stroke-width:1}
+    .led.off{fill:#f3a3a3}
+    .led.blink{animation:blink 1s infinite}
+
+    @keyframes flow{to{stroke-dashoffset:-20}}
+    @keyframes blink{50%{opacity:0.18}} 
+
+    @media (max-width:900px){.layout{grid-template-columns:1fr;}.panel{padding:12px}.devices{flex-direction:row;overflow:auto} .svg-wrap{height:240px}}
   </style>
 </head>
 <body>
@@ -78,6 +102,77 @@
         </div>
       </main>
     </div>
+
+    <!-- Circuit simulation SVG -->
+    <div id="circuitWrap">
+      <div class="circuit-panel panel">
+        <div class="circuit-header">
+          <div>
+            <div class="circuit-title">Circuit Simulation</div>
+            <div class="circuit-sub">SVG + CSS simulation: battery → STM32 (blue pill) → GPS module → LCD. Click <strong>Start</strong> to animate current flow and LED blink.</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button id="cStart" class="btn">Start</button>
+            <button id="cStop" class="btn ghost">Stop</button>
+          </div>
+        </div>
+
+        <div class="svg-wrap">
+          <svg viewBox="0 0 1000 360" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+            <!-- Battery -->
+            <rect x="30" y="120" width="120" height="100" rx="8" class="comp"/>
+            <text x="90" y="155" text-anchor="middle" class="label">Battery</text>
+            <text x="90" y="175" text-anchor="middle" class="label" style="font-size:11px;fill:#64748b">12V</text>
+
+            <!-- STM32 Blue Pill -->
+            <rect x="220" y="90" width="180" height="140" rx="10" class="chip"/>
+            <text x="310" y="130" text-anchor="middle" class="label">STM32</text>
+            <text x="310" y="150" text-anchor="middle" class="label" style="font-size:11px;fill:#64748b">Blue Pill</text>
+
+            <!-- GPS module -->
+            <rect x="470" y="120" width="140" height="80" rx="8" class="comp"/>
+            <text x="540" y="155" text-anchor="middle" class="label">GPS</text>
+            <text x="540" y="175" text-anchor="middle" class="label" style="font-size:11px;fill:#64748b">UART/NMEA</text>
+
+            <!-- LCD -->
+            <rect x="700" y="100" width="200" height="120" rx="10" class="comp"/>
+            <text x="800" y="140" text-anchor="middle" class="label">LCD</text>
+            <text x="800" y="160" text-anchor="middle" class="label" style="font-size:11px;fill:#64748b">16x2</text>
+
+            <!-- Wires (static grey) -->
+            <path d="M150 170 L220 170" class="wire" id="w1"/>
+            <path d="M400 170 L470 170" class="wire" id="w2"/>
+            <path d="M610 160 L700 160" class="wire" id="w3"/>
+
+            <!-- Return wires -->
+            <path d="M150 190 L220 190" class="wire"/>
+            <path d="M400 190 L470 190" class="wire"/>
+            <path d="M610 180 L700 180" class="wire"/>
+
+            <!-- Current flow overlays (hidden by default) -->
+            <path d="M150 170 L220 170" class="wire current flow1" id="f1" style="visibility:hidden"/>
+            <path d="M400 170 L470 170" class="wire current flow2" id="f2" style="visibility:hidden"/>
+            <path d="M610 160 L700 160" class="wire current flow3" id="f3" style="visibility:hidden"/>
+
+            <!-- LED indicator near STM32 -->
+            <circle cx="420" cy="105" r="8" class="led" id="led1"/>
+            <text x="440" y="110" class="label" style="font-size:11px;fill:#64748b">Power LED</text>
+
+            <!-- Small moving dot to simulate electrons along whole chain -->
+            <circle r="6" fill="#2563eb" id="dot" style="visibility:hidden">
+              <animateMotion id="motion" dur="4s" repeatCount="indefinite" fill="freeze" path="M150 170 L220 170 L310 170 L400 170 L470 170 L540 170 L610 160 L700 160" />
+            </circle>
+
+            <!-- labels/legend -->
+            <text x="30" y="60" class="label" style="font-size:13px;fill:#475569">Simple Circuit (visual only)</text>
+
+          </svg>
+        </div>
+
+        <div class="small" style="margin-top:12px;color:var(--muted)">This is a visual SVG simulation for presentation. It doesn't run real electronics, but demonstrates flow and indicators visually.</div>
+      </div>
+    </div>
+
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -187,6 +282,29 @@
       }
       requestAnimationFrame(step);
     }
+
+    // Circuit controls
+    const cStart = document.getElementById('cStart');
+    const cStop = document.getElementById('cStop');
+    const flows = [document.getElementById('f1'), document.getElementById('f2'), document.getElementById('f3')];
+    const motion = document.getElementById('motion');
+    const dot = document.getElementById('dot');
+    const led1 = document.getElementById('led1');
+
+    function startCircuit(){
+      flows.forEach(f=>f.style.visibility = 'visible');
+      dot.style.visibility = 'visible';
+      led1.classList.add('blink');
+    }
+    function stopCircuit(){
+      flows.forEach(f=>f.style.visibility = 'hidden');
+      dot.style.visibility = 'hidden';
+      led1.classList.remove('blink');
+    }
+
+    cStart.addEventListener('click', startCircuit);
+    cStop.addEventListener('click', stopCircuit);
+
   </script>
 </body>
 </html>
